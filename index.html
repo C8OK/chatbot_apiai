@@ -1,0 +1,110 @@
+<html>
+<head>
+	<title>API Example</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/botui/build/botui.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/botui/build/botui-theme-default.css" />
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/vue/2.0.5/vue.min.js"></script>
+  <script src="https://unpkg.com/botui/build/botui.js"></script>
+
+	<script type="text/javascript">
+		var accessToken = "9eabd0046fe74c50a2e00b88e6428f82";
+		var baseUrl = "https://api.api.ai/v1/";
+		//For Demo purpose. UserName and password can be encrypted and stored in a database
+		var userPassMap = {"Vishal":"Pass123", "Priya":"Password1"};
+		var oldRes = "";
+		var userName = "";
+
+		$(document).ready(function() {
+      bot();
+		});
+
+		function isValidPass(pass) {
+			var passDb = userPassMap[userName];
+			return passDb == pass;
+		}
+
+		function replacePassText(val) {
+      var out = [];
+      for(i = 0; i < val.length; i++) {
+        out.push("*");
+      }
+      return out.join('');
+    }
+
+		function hidePassword() {
+      return oldRes.includes("please enter your old password") || oldRes.includes("Please enter your new password");
+    }
+
+		function validate(text) {
+			if(oldRes.includes("please enter your old password")) {
+				return isValidPass(text)? "**" : "InvPass";
+	    } else if(oldRes.includes("Please enter your new password")) {
+	      return "****";
+	    }
+			return text;
+		}
+
+		function updateUser(val) {
+			if(oldRes.includes("Please provide your username")) {
+				userName = val.result.parameters.username;
+			}
+		}
+
+		function processJSON(val) {
+      return val.result.speech;
+    }
+	</script>
+</head>
+<body>
+  <div class="botui-app-container" id="pass-reset">
+    <bot-ui></bot-ui>
+  </div>
+  <script src="https://cdn.jsdelivr.net/vue/latest/vue.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/botui/build/botui.js"></script>
+  <script>
+    var botui = new BotUI('pass-reset');
+
+    function bot() {
+      botui.action.text({
+					addMessage: !hidePassword(),
+          action: {
+            placeholder: 'Enter your text here'
+          }
+      }).then(function (res) { // wait till previous message has been shown.
+					var resText = "";
+					if(hidePassword()) {
+						botui.message.add({
+							human: true,
+							content: replacePassText(res.value)
+						});
+					}
+					delay: 1300
+					resText = validate(res.value);
+          $.ajax({
+    				type: "POST",
+    				url: baseUrl + "query?v=10101010",
+    				contentType: "application/json; charset=utf-8",
+    				dataType: "json",
+    				headers: {
+    					"Authorization": "Bearer " + accessToken
+    				},
+    				data: JSON.stringify({ query: resText, lang: "en", sessionId: "randSessId" }),
+    				success: function(data) {
+							updateUser(data);
+							var parseText = processJSON(data);
+              botui.message.add({
+                content: parseText
+              }).then(bot);
+							oldRes = parseText;
+    				},
+    				error: function() {
+    					return 'Internal Server Error';
+    				}
+    			});
+      });
+    }
+  </script>
+</body>
+</html>
